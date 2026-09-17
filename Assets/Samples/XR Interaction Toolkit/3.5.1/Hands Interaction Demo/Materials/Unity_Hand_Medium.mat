@@ -142,6 +142,7 @@ Material:
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 10
+    - _DstBlendAlpha: 10
     - _EdgeHighlightPower: 5
     - _FadeSize: 0.02
     - _FadeStart: 0.12
@@ -177,6 +178,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 5
+    - _SrcBlendAlpha: 1
     - _Surface: 1
     - _TransitionSize: 0.1
     - _UVSec: 0

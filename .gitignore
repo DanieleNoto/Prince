@@ -112,3 +112,7 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Output di Claude e scene di recupero di Unity
+/Claude outputs/
+/Assets/_Recovery/
