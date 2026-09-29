@@ -1520,7 +1520,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 651d103057d74c4d8e51d0b368d3d98b, type: 3}
   m_Name: ColocationDiscoveryFeature Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Colocation Discovery'
   version: 1.0.0
   featureIdInternal: com.unity.openxr.feature.meta-colocation-discovery
@@ -2169,8 +2169,19 @@ MonoBehaviour:
   features:
   - {fileID: -4952000796976196145}
   - {fileID: -2491787981907955443}
+  - {fileID: 2883511814213636832}
+  - {fileID: -9026652866319701375}
   - {fileID: 1951018764672190297}
+  - {fileID: -2054383958886414394}
+  - {fileID: 4942677997835251639}
+  - {fileID: -2173134391043388825}
+  - {fileID: -3250116796876806771}
+  - {fileID: -3335852980000037439}
   - {fileID: 2569829961061686938}
+  - {fileID: 2033621525816982791}
+  - {fileID: -6426410061028430728}
+  - {fileID: -1504150700836558969}
+  - {fileID: 8401458205557388409}
   - {fileID: 2287003450481494527}
   - {fileID: 8306122736625590588}
   - {fileID: 5191136607646899970}
@@ -2180,6 +2191,8 @@ MonoBehaviour:
   - {fileID: -3846335136845076156}
   - {fileID: 4681200711722324571}
   - {fileID: 7011950827455191797}
+  - {fileID: -8396959079913673243}
+  - {fileID: 5404848405410436282}
   - {fileID: -2435442203200508377}
   - {fileID: 1319110879864311695}
   - {fileID: 4159488731773155621}
@@ -2192,11 +2205,13 @@ MonoBehaviour:
   - {fileID: -8169811520713400255}
   - {fileID: 1225229891580235517}
   - {fileID: -5341480767641357417}
+  - {fileID: -2395593922798591543}
   - {fileID: 8566065205911682659}
   - {fileID: -396232969936738352}
   - {fileID: -532194121422872633}
   - {fileID: 783439433049242180}
   - {fileID: 4486631924995925811}
+  - {fileID: -3161631640218476830}
   - {fileID: -465092213662548301}
   - {fileID: 3376753766441564465}
   - {fileID: 2812386270381160496}
@@ -2206,21 +2221,6 @@ MonoBehaviour:
   - {fileID: -8549710497411994019}
   - {fileID: -2351749185442687150}
   - {fileID: -6086513884656706645}
-  - {fileID: -2395593922798591543}
-  - {fileID: -3335852980000037439}
-  - {fileID: 4942677997835251639}
-  - {fileID: 2883511814213636832}
-  - {fileID: -9026652866319701375}
-  - {fileID: -2173134391043388825}
-  - {fileID: 2033621525816982791}
-  - {fileID: -1504150700836558969}
-  - {fileID: -3250116796876806771}
-  - {fileID: -2054383958886414394}
-  - {fileID: -6426410061028430728}
-  - {fileID: 8401458205557388409}
-  - {fileID: -3161631640218476830}
-  - {fileID: 5404848405410436282}
-  - {fileID: -8396959079913673243}
   customLoaderName: 
   m_renderMode: 1
   m_latencyOptimization: 0
@@ -2924,7 +2924,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2a13300a9e14cacbb01ed5d6ae84e69, type: 3}
   m_Name: ARMeshFeature Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: 'Meta Quest: Meshing'
   version: 0.1.0
   featureIdInternal: com.unity.openxr.feature.arfoundation-meta-mesh

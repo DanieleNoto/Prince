@@ -166,6 +166,7 @@ public class BpmnSceneBuilder : MonoBehaviour
 
     public IReadOnlyDictionary<string, GameObject> NodeObjects => nodeObjects;
     public BpmnDocument Document => document;
+    public bool IsReady { get; private set; }
 
     void Start()
     {
@@ -176,12 +177,35 @@ public class BpmnSceneBuilder : MonoBehaviour
     {
         yield return LoadAndBuild();
 
-        if (!placeInFrontOfCameraOnStart) yield break;
+        if (!placeInFrontOfCameraOnStart) { IsReady = true; yield break; }
 
-        for (int i = 0; i < Mathf.Max(1, trackingWarmupFrames); i++)
+        // Wait for the actual Link head pose, then place once in world space.
+        var xrSettings = UnityEngine.XR.Management.XRGeneralSettings.Instance;
+        bool waitForHead = xrSettings != null && xrSettings.Manager != null
+            && xrSettings.Manager.activeLoader != null;
+        if (diagramRoot != null && waitForHead) diagramRoot.gameObject.SetActive(false);
+
+        int stableFrames = 0;
+        while (stableFrames < Mathf.Max(1, trackingWarmupFrames))
+        {
+            bool poseValid = !waitForHead;
+            if (waitForHead)
+            {
+                var head = UnityEngine.XR.InputDevices.GetDeviceAtXRNode(UnityEngine.XR.XRNode.Head);
+                poseValid = head.isValid
+                    && head.TryGetFeatureValue(UnityEngine.XR.CommonUsages.isTracked, out bool tracked)
+                    && tracked
+                    && head.TryGetFeatureValue(UnityEngine.XR.CommonUsages.trackingState, out var state)
+                    && (state & (UnityEngine.XR.InputTrackingState.Position | UnityEngine.XR.InputTrackingState.Rotation))
+                        == (UnityEngine.XR.InputTrackingState.Position | UnityEngine.XR.InputTrackingState.Rotation);
+            }
+            stableFrames = poseValid ? stableFrames + 1 : 0;
             yield return null;
+        }
 
         PlaceInFrontOfCamera();
+        if (diagramRoot != null) diagramRoot.gameObject.SetActive(true);
+        IsReady = diagramRoot != null;
     }
 
     public IEnumerator LoadAndBuild()

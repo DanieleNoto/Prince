@@ -1128,7 +1128,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1169920386
 Transform:
   m_ObjectHideFlags: 0
@@ -2806,6 +2806,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2004528375}
   - component: {fileID: 2004528374}
+  - component: {fileID: 2004528376}
   m_Layer: 0
   m_Name: BPMN Viewer
   m_TagString: Untagged
@@ -2875,7 +2876,7 @@ MonoBehaviour:
   pulseHardBlink: 0
   stopPulseAfterOpening: 0
   placeInFrontOfCameraOnStart: 1
-  fitDistanceToDiagram: 0
+  fitDistanceToDiagram: 1
   distance: 1.6
   minDistance: 1
   maxDistance: 4
@@ -2896,6 +2897,23 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2004528376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2004528373}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e50e23cb8924df04585e08090264abdc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BpmnNavigator
+  followUser: 1
+  followDeadZone: 0.25
+  followSpeed: 3
+  moveStep: 0.2
+  closeDistance: 1.15
 --- !u!1 &2066117192 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8893227839204258060, guid: 66d40221d132d04499855da9ce315f20, type: 3}
