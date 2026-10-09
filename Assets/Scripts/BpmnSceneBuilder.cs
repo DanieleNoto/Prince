@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using Bpmn;
 using TMPro;
 using UnityEngine;
@@ -8,16 +7,20 @@ using UnityEngine.Networking;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
-/// Legge un file .bpmn da StreamingAssets, ricostruisce il diagramma in 3D usando le
+/// Riceve un BPMN dalle API esclusivamente in RAM, ricostruisce il diagramma in 3D usando le
 /// coordinate originali del BPMNDiagram, e all'avvio lo piazza centrato davanti alla camera.
 /// </summary>
 [DisallowMultipleComponent]
 public class BpmnSceneBuilder : MonoBehaviour
 {
     [Header("Sorgente")]
-    [Tooltip("Nome del file dentro Assets/StreamingAssets.")]
-    public string bpmnFileName = "process.bpmn";
-
+    [Tooltip("Indirizzo del server raggiungibile dal Quest sulla stessa rete.")]
+    public string apiBaseUrl = "http://192.168.1.55:3000";
+    public string diagramId = "richiesta_ferie";
+    [Tooltip("Opzionale: inviata nell'header X-Api-Key.")]
+    public string apiKey = "";
+    [Min(1)] public int requestTimeoutSeconds = 15;
+    public string LoadError { get; private set; }
     [Header("Prefab")]
     public GameObject nodePrefab;
 
@@ -168,8 +171,11 @@ public class BpmnSceneBuilder : MonoBehaviour
     public BpmnDocument Document => document;
     public bool IsReady { get; private set; }
 
+    public bool enableLiveChart = true;
+
     void Start()
     {
+        if (enableLiveChart && GetComponent<LiveValueChart>() == null) gameObject.AddComponent<LiveValueChart>();
         StartCoroutine(BuildAndPlace());
     }
 
@@ -177,6 +183,7 @@ public class BpmnSceneBuilder : MonoBehaviour
     {
         yield return LoadAndBuild();
 
+        if (diagramRoot == null) yield break;
         if (!placeInFrontOfCameraOnStart) { IsReady = true; yield break; }
 
         // Wait for the actual Link head pose, then place once in world space.
@@ -216,46 +223,47 @@ public class BpmnSceneBuilder : MonoBehaviour
             yield break;
         }
 
-        string path = Path.Combine(Application.streamingAssetsPath, bpmnFileName);
-        string xml = null;
-
-        // Su Android StreamingAssets sta dentro l'APK: File.ReadAllText non funziona.
-        if (path.Contains("://") || path.Contains(":///"))
+        LoadError = null;
+        if (!System.Uri.TryCreate(apiBaseUrl, System.UriKind.Absolute, out var server)
+            || (server.Scheme != "http" && server.Scheme != "https")
+            || string.IsNullOrWhiteSpace(diagramId))
         {
-            using (UnityWebRequest request = UnityWebRequest.Get(path))
-            {
-                yield return request.SendWebRequest();
-
-                if (request.result != UnityWebRequest.Result.Success)
-                {
-                    Debug.LogError($"[BPMN] Lettura fallita: {path} ({request.error})", this);
-                    yield break;
-                }
-
-                xml = request.downloadHandler.text;
-            }
+            LoadError = "Imposta un URL HTTP/HTTPS e l'id del diagramma nel BPMN Viewer.";
+            Debug.LogError("[BPMN] " + LoadError, this);
+            yield break;
         }
-        else
+
+        string url = apiBaseUrl.TrimEnd('/') + "/api/diagrams/"
+            + System.Uri.EscapeDataString(diagramId.Trim()) + "/raw";
+        string xml;
+        // UnityWebRequest.Get uses DownloadHandlerBuffer: no disk cache or local file.
+        using (UnityWebRequest request = UnityWebRequest.Get(url))
         {
-            if (!File.Exists(path))
+            request.timeout = Mathf.Max(1, requestTimeoutSeconds);
+            request.SetRequestHeader("Accept", "application/xml");
+            if (!string.IsNullOrEmpty(apiKey)) request.SetRequestHeader("X-Api-Key", apiKey);
+            yield return request.SendWebRequest();
+            if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError($"[BPMN] File non trovato: {path}", this);
+                LoadError = $"API non raggiungibile o richiesta rifiutata (HTTP {request.responseCode}, {request.error}). Controlla server, Wi-Fi, id e API key.";
+                Debug.LogError("[BPMN] " + LoadError, this);
                 yield break;
             }
-
-            xml = File.ReadAllText(path);
+            xml = request.downloadHandler.text;
+            Debug.Log($"[BPMN API] Ricevuto {diagramId}: HTTP {request.responseCode}, {request.downloadedBytes} byte, solo RAM.", this);
         }
-
         try
         {
             document = BpmnDocument.Parse(xml);
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[BPMN] XML non valido: {e.Message}", this);
+            LoadError = "XML BPMN non valido: " + e.Message;
+            Debug.LogError("[BPMN] " + LoadError, this);
             yield break;
         }
 
+        xml = null; // Release the raw payload; only the parsed model remains.
         Rebuild();
     }
 

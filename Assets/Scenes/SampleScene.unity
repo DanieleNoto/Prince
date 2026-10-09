@@ -2826,7 +2826,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c06657b2e7756b2409a4dd7ad4e2d1ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BpmnSceneBuilder
-  bpmnFileName: richiesta-ferie.bpmn
+  apiBaseUrl: http://192.168.1.55:3000
+  diagramId: richiesta_ferie
+  apiKey:
+  requestTimeoutSeconds: 15
   nodePrefab: {fileID: 3559901139526480132, guid: 3c3e8b3da6faeb449a526cba658ac64f, type: 3}
   autoScaleFromPrefab: 1
   scale: 0.002
