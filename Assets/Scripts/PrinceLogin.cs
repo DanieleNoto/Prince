@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -9,11 +10,6 @@ public static class PrinceLogin
 {
     public const string LoginUrl = "https://prince.eka.it:30001/iprelDataTemp/core/login";
     [Serializable] class Credentials { public string username, password, realm; }
-    [Serializable] class TokenResponse
-    {
-        public string access_token, refresh_token, token_type;
-        public int expires_in, refresh_expires_in;
-    }
     [Serializable] class CachedSession
     {
         public string accessToken;
@@ -73,16 +69,18 @@ public static class PrinceLogin
                         ? "Accesso rifiutato" : $"Login non riuscito (HTTP {request.responseCode})";
                     completed?.Invoke(false, Status); yield break;
                 }
-                TokenResponse token = null;
-                try { token = JsonUtility.FromJson<TokenResponse>(request.downloadHandler.text); }
+                long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                string accessToken = null;
+                long expiresAt = 0;
+                try { ReadToken(request.downloadHandler.text, now, out accessToken, out expiresAt); }
                 catch (Exception) { /* Never log a response containing credentials or tokens. */ }
-                if (token == null || string.IsNullOrEmpty(token.access_token) || token.expires_in <= 15)
+                if (string.IsNullOrEmpty(accessToken) || expiresAt - 15 <= now)
                 {
                     Logout(); Status = "Risposta login priva di un token valido";
                     completed?.Invoke(false, Status); yield break;
                 }
-                AccessToken = token.access_token;
-                ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + token.expires_in;
+                AccessToken = accessToken;
+                ExpiresAt = expiresAt;
                 Status = "Login Prince OK";
 #if UNITY_EDITOR
                 try
@@ -109,6 +107,7 @@ public static class PrinceLogin
         using (var request = UnityWebRequest.Get(url))
         {
             request.SetRequestHeader("Authorization", "Bearer " + AccessToken);
+            request.SetRequestHeader("Accept", "application/json");
             request.redirectLimit = 0;
             request.timeout = 20;
             yield return request.SendWebRequest();
@@ -119,6 +118,40 @@ public static class PrinceLogin
                 onError?.Invoke($"Richiesta Prince fallita (HTTP {request.responseCode})");
             }
         }
+    }
+
+    /// <summary>
+    /// Accetta sia la risposta Keycloak standard (access_token, expires_in) sia varianti del
+    /// backend (accessToken, token o il JWT come testo). Se manca expires_in usa il claim exp.
+    /// </summary>
+    static void ReadToken(string body, long now, out string token, out long expiresAt)
+    {
+        token = null; expiresAt = 0;
+        string text = body?.Trim().Trim('"');
+        if (string.IsNullOrEmpty(text)) return;
+
+        if (text.StartsWith("{"))
+        {
+            var json = JObject.Parse(text);
+            token = (string)(json["access_token"] ?? json["accessToken"] ?? json["token"]);
+            var expiresIn = json["expires_in"] ?? json["expiresIn"];
+            if (expiresIn != null && expiresIn.Type == JTokenType.Integer && (long)expiresIn > 0)
+                expiresAt = now + (long)expiresIn;
+        }
+        else if (text.StartsWith("eyJ")) token = text;
+
+        if (!string.IsNullOrEmpty(token) && expiresAt == 0) expiresAt = JwtExpiry(token);
+    }
+
+    static long JwtExpiry(string jwt)
+    {
+        string[] parts = jwt.Split('.');
+        if (parts.Length != 3) return 0;
+        string payload = parts[1].Replace('-', '+').Replace('_', '/');
+        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+        var claims = JObject.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(payload)));
+        var exp = claims["exp"];
+        return exp != null && exp.Type == JTokenType.Integer ? (long)exp : 0;
     }
 
     public static void Logout()

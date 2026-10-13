@@ -14,6 +14,8 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 public class BpmnSceneBuilder : MonoBehaviour
 {
     [Header("Sorgente")]
+    [Tooltip("Scarica il diagramma da apiBaseUrl all'avvio. Spento: il diagramma arriva dalla lista processi Prince (LoadFromXml).")]
+    public bool loadFromApiOnStart = false;
     [Tooltip("Indirizzo del server raggiungibile dal Quest sulla stessa rete.")]
     public string apiBaseUrl = "http://192.168.1.55:3000";
     public string diagramId = "richiesta_ferie";
@@ -170,13 +172,61 @@ public class BpmnSceneBuilder : MonoBehaviour
     public IReadOnlyDictionary<string, GameObject> NodeObjects => nodeObjects;
     public BpmnDocument Document => document;
     public bool IsReady { get; private set; }
+    public Transform DiagramRoot => diagramRoot;
+
+    /// <summary>Lanciato dopo ogni ricostruzione completa e posizionamento del diagramma.</summary>
+    public event System.Action DiagramBuilt;
+    Vector3 initialScale = Vector3.one;
+
+    void Awake() => initialScale = transform.localScale;
 
     public bool enableLiveChart = true;
 
     void Start()
     {
         if (enableLiveChart && GetComponent<LiveValueChart>() == null) gameObject.AddComponent<LiveValueChart>();
-        StartCoroutine(BuildAndPlace());
+        if (loadFromApiOnStart) StartCoroutine(BuildAndPlace());
+    }
+
+    /// <summary>
+    /// Costruisce il diagramma da un XML BPMN gia' in memoria (es. ricevuto da Prince/Camunda)
+    /// e lo piazza davanti alla camera. Sostituisce l'eventuale diagramma precedente.
+    /// </summary>
+    public bool LoadFromXml(string xml, string sourceLabel = null)
+    {
+        LoadError = null;
+        if (nodePrefab == null)
+        {
+            LoadError = "nodePrefab non assegnato nel BPMN Viewer.";
+            Debug.LogError("[BPMN] " + LoadError, this);
+            return false;
+        }
+
+        BpmnDocument parsed;
+        try { parsed = BpmnDocument.Parse(xml); }
+        catch (System.Exception e)
+        {
+            LoadError = "XML BPMN non valido: " + e.Message;
+            Debug.LogError("[BPMN] " + LoadError, this);
+            return false;
+        }
+
+        document = parsed;
+        transform.localScale = initialScale; // annulla lo zoom del navigatore sul diagramma precedente
+        Rebuild();
+        if (diagramRoot == null)
+        {
+            LoadError = "Il BPMN non contiene le coordinate del diagramma (BPMNDiagram).";
+            Debug.LogError("[BPMN] " + LoadError, this);
+            IsReady = false;
+            return false;
+        }
+
+        PlaceInFrontOfCamera();
+        IsReady = true;
+        Debug.Log($"[BPMN] Caricato {sourceLabel ?? "diagramma"} da XML in memoria.", this);
+        DiagramBuilt?.Invoke();
+        return true;
     }
 
     IEnumerator BuildAndPlace()
@@ -547,6 +597,10 @@ public class BpmnSceneBuilder : MonoBehaviour
 
         if (diagramRoot == null) return;
 
+        // Destroy e' differito a fine frame: si rinomina subito, cosi' chi cerca "Diagram"
+        // trova solo quello nuovo.
+        diagramRoot.name = "Diagram (rimosso)";
+        diagramRoot.gameObject.SetActive(false);
         if (Application.isPlaying) Destroy(diagramRoot.gameObject);
         else DestroyImmediate(diagramRoot.gameObject);
 

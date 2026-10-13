@@ -35,11 +35,12 @@ public class BpmnNavigator : MonoBehaviour
     {
         builder = GetComponent<BpmnSceneBuilder>();
         viewer = Camera.main;
+        builder.DiagramBuilt += OnDiagramBuilt;
         while (!builder.IsReady || builder.Document == null || builder.NodeObjects.Count == 0 ||
-               transform.Find("Diagram") == null || !transform.Find("Diagram").gameObject.activeSelf)
+               builder.DiagramRoot == null || !builder.DiagramRoot.gameObject.activeSelf)
             yield return null;
 
-        diagram = transform.Find("Diagram");
+        diagram = builder.DiagramRoot;
         originalScale = transform.localScale;
         BuildOrder();
         if (viewer == null) viewer = Camera.main;
@@ -47,6 +48,20 @@ public class BpmnNavigator : MonoBehaviour
         headAnchor = viewer.transform.position;
         BuildPanel();
         ready = true;
+        RefreshLabels();
+    }
+
+    /// <summary>Un nuovo diagramma ha sostituito il precedente: si riparte dalla panoramica.</summary>
+    void OnDiagramBuilt()
+    {
+        if (!ready) return; // il primo diagramma lo gestisce Start
+        visibility.Clear();
+        nodes.Clear();
+        selected = -1;
+        diagram = builder.DiagramRoot;
+        originalScale = transform.localScale;
+        BuildOrder();
+        if (viewer != null) headAnchor = viewer.transform.position;
         RefreshLabels();
     }
 
@@ -329,5 +344,6 @@ public class BpmnNavigator : MonoBehaviour
         Release(backgroundMaterial);
         Release(buttonMaterial);
         Release(hoverMaterial);
+        if (builder != null) builder.DiagramBuilt -= OnDiagramBuilt;
     }
 }
