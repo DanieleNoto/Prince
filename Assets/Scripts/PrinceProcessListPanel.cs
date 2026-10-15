@@ -12,7 +12,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 /// Il click seleziona il processo e lancia ProcessSelected: il caricamento del BPMN arrivera' dopo.
 /// </summary>
 [DisallowMultipleComponent]
-public class PrinceProcessListPanel : MonoBehaviour
+public partial class PrinceProcessListPanel : MonoBehaviour
 {
     const float Pad = 0.025f;
     const float TitleBlock = 0.045f;
@@ -48,9 +48,9 @@ public class PrinceProcessListPanel : MonoBehaviour
     public float width = 0.62f;
 
     [Header("Posizione")]
-    public float distance = 0.9f;
+    public float distance = 1.35f;
     [Tooltip("Gradi rispetto alla direzione di sguardo: 0 = dritto davanti, negativo = a sinistra.")]
-    public float yawOffset = 0f;
+    public float yawOffset = -65f;
     [Tooltip("Metri rispetto all'altezza degli occhi. Negativo = piu' in basso.")]
     public float verticalOffset = -0.05f;
     [Tooltip("Frame di attesa prima di posizionare: all'avvio il tracking XR non ha ancora una posa valida.")]
@@ -70,14 +70,14 @@ public class PrinceProcessListPanel : MonoBehaviour
     public Color camundaActiveColor = new Color(0.45f, 0.9f, 0.55f);
     public Color camundaSuspendedColor = new Color(1f, 0.72f, 0.3f);
     public Color camundaMissingColor = new Color(0.55f, 0.6f, 0.68f);
-    [Tooltip("Mostra anche le definizioni Camunda che non hanno un processo collegato in /process.")]
-    public bool showUnlinkedDefinitions = true;
+
+
 
     [Header("Diagramma")]
     [Tooltip("Al click carica il BPMN del processo nel BPMN Viewer della scena.")]
     public bool openDiagramOnSelect = true;
     [Tooltip("Dopo l'apertura del diagramma il pannello si sposta di lato di questi gradi (0 = resta dov'e').")]
-    public float asideYawAfterOpen = -40f;
+    public float asideYawAfterOpen = -65f;
 
     [Header("Eventi")]
     [Tooltip("Riceve l'id del record del processo selezionato.")]
@@ -98,16 +98,18 @@ public class PrinceProcessListPanel : MonoBehaviour
     }
 
     readonly List<PrinceProcess> processes = new List<PrinceProcess>();
+    readonly List<PrinceProcess> filtered = new List<PrinceProcess>();
     readonly List<Row> rows = new List<Row>();
     readonly List<Material> materials = new List<Material>();
     int page;
     bool loading, openingDiagram;
     TMP_Text status;
+    TMP_Text processCountTitle;
     Material backgroundMat, rowMat, rowHoverMat, rowSelectedMat;
     Camera viewer;
 
     bool HasCredentials => !string.IsNullOrWhiteSpace(username) && !string.IsNullOrEmpty(password);
-    int PageCount => Mathf.Max(1, Mathf.CeilToInt(processes.Count / (float)rowsPerPage));
+    int PageCount => Mathf.Max(1, Mathf.CeilToInt(filtered.Count / (float)rowsPerPage));
 
     IEnumerator Start()
     {
@@ -164,14 +166,24 @@ public class PrinceProcessListPanel : MonoBehaviour
             List<PrinceProcessDefinition> definitions = null;
             string camundaError = null;
             yield return PrinceProcesses.FetchDefinitions(d => definitions = d, e => camundaError = e);
+            // Keep Prince records and individual Camunda definitions as separate list entries.
+            if (definitions != null) PrinceProcesses.Link(result, definitions);
+            var allPrince = new List<PrinceProcess>(result);
+            result.RemoveAll(p => string.Equals(p.status?.Trim(), "DEPRECATED", StringComparison.OrdinalIgnoreCase));
             if (definitions != null)
             {
-                var orphans = PrinceProcesses.Link(result, definitions);
-                if (showUnlinkedDefinitions) result.AddRange(PrinceProcesses.FromOrphans(orphans));
+                var camundaRows = PrinceProcesses.FromDefinitions(definitions);
+                foreach (var row in camundaRows)
+                {
+                    var linked = allPrince.Find(p => p.id == row.Latest.processLinked);
+                    if (linked != null) row.user = linked.user;
+                }
+                result.AddRange(camundaRows);
             }
-
             processes.Clear();
             processes.AddRange(result);
+            ApplyFilters(false);
+
             if (Selected != null) Selected = processes.Find(p => p.id == Selected.id);
             page = 0;
             ShowPage();
@@ -205,10 +217,10 @@ public class PrinceProcessListPanel : MonoBehaviour
         {
             int index = page * rowsPerPage + i;
             Row row = rows[i];
-            bool used = index < processes.Count;
+            bool used = index < filtered.Count;
             row.go.SetActive(used);
             row.hovered = false;
-            row.process = used ? processes[index] : null;
+            row.process = used ? filtered[index] : null;
             if (!used) continue;
             row.name.text = row.process.DisplayName;
             row.details.text = Details(row.process);
@@ -218,13 +230,14 @@ public class PrinceProcessListPanel : MonoBehaviour
             Paint(row);
         }
 
-        if (processes.Count == 0) SetStatus("Nessun processo disponibile");
+        if (processCountTitle != null) processCountTitle.text = $"Processi: {filtered.Count} / {processes.Count}";
+        if (filtered.Count == 0) SetStatus("Nessun processo corrisponde ai filtri");
         else SetStatus(StatusLine());
     }
 
     string StatusLine()
     {
-        string line = processes.Count == 1 ? "1 processo" : processes.Count + " processi";
+        string line = filtered.Count == 1 ? "1 processo" : filtered.Count + " processi";
         if (PageCount > 1) line += $"  |  pagina {page + 1}/{PageCount}";
         if (Selected != null) line += "  |  selezionato: " + Selected.DisplayName;
         return line;
@@ -326,7 +339,7 @@ public class PrinceProcessListPanel : MonoBehaviour
             if (!ok) { SetStatus(builder.LoadError ?? "Diagramma non valido", true); yield break; }
 
             SetStatus($"Aperto: {process.DisplayName} ({source})");
-            if (!Mathf.Approximately(asideYawAfterOpen, 0f)) PlaceAt(asideYawAfterOpen);
+            // Keep the list where the user placed it when opening a process.
         }
         finally { openingDiagram = false; }
     }
@@ -390,6 +403,7 @@ public class PrinceProcessListPanel : MonoBehaviour
     void SetVisible(bool visible)
     {
         foreach (Transform child in transform) child.gameObject.SetActive(visible);
+        if (visible && filterKeyboard != null) filterKeyboard.SetActive(editing >= 0);
         if (visible) ShowPage(); // riapplica le righe vuote nascoste
     }
 
@@ -403,21 +417,23 @@ public class PrinceProcessListPanel : MonoBehaviour
         rowSelectedMat = MakeMaterial("Prince List Row Selected", rowSelectedColor);
 
         float inner = width - Pad * 2f;
-        float height = Pad * 2f + TitleBlock + StatusBlock + rowsPerPage * (RowHeight + RowGap) + FooterHeight;
+        float height = Pad * 2f + TitleBlock + StatusBlock + FilterHeight + rowsPerPage * (RowHeight + RowGap) + FooterHeight;
         float top = height * 0.5f;
+        PanelMoveBar.Attach(transform, top, width, rowMat);
 
         Quad(transform, "Background", Vector3.zero, new Vector2(width, height), backgroundMat);
 
-        var title = Text(transform, "Processi Prince", new Vector3(0f, top - Pad - TitleBlock * 0.5f, -0.006f),
+        processCountTitle = Text(transform, "Processi: --", new Vector3(0f, top - Pad - TitleBlock * 0.5f, -0.006f),
             new Vector2(inner, TitleBlock), 0.032f);
-        title.fontStyle = FontStyles.Bold;
+        processCountTitle.fontStyle = FontStyles.Bold;
 
         status = Text(transform, "In attesa del tracking...",
             new Vector3(0f, top - Pad - TitleBlock - StatusBlock * 0.5f, -0.006f),
             new Vector2(inner, StatusBlock), 0.020f);
         status.color = detailsColor;
 
-        float firstRowY = top - Pad - TitleBlock - StatusBlock - RowHeight * 0.5f;
+        BuildFilters(top - Pad - TitleBlock - StatusBlock, inner, -top);
+        float firstRowY = top - Pad - TitleBlock - StatusBlock - FilterHeight - RowHeight * 0.5f;
         for (int i = 0; i < rowsPerPage; i++)
             rows.Add(BuildRow(new Vector3(0f, firstRowY - i * (RowHeight + RowGap), -0.004f), inner));
 

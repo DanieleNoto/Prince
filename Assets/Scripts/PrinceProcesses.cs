@@ -221,6 +221,28 @@ public static class PrinceProcesses
         return result;
     }
 
+    /// <summary>One selectable entry per Camunda definition, without merging versions.</summary>
+    public static List<PrinceProcess> FromDefinitions(List<PrinceProcessDefinition> definitions)
+    {
+        var result = new List<PrinceProcess>();
+        foreach (var definition in definitions)
+        {
+            var process = new PrinceProcess
+            {
+                id = "camunda:" + definition.id,
+                processName = string.IsNullOrWhiteSpace(definition.name) ? definition.key : definition.name,
+                processId = definition.key,
+                filename = definition.resource,
+                status = "CAMUNDA",
+                uploaded = definition.uploaded,
+                version = definition.version
+            };
+            // Opening this row retrieves this exact version, not the newest of its key.
+            process.definitions.Add(definition);
+            result.Add(process);
+        }
+        return result;
+    }
     public static IEnumerator FetchAll(Action<List<PrinceProcess>> onOk, Action<string> onError)
     {
         string body = null, error = null;

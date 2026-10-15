@@ -56,6 +56,7 @@ public class LiveValueChart : MonoBehaviour
         pauseLabel = Button("Pausa", -.5f, ()=>{paused=!paused;pauseLabel.text=paused?"Riprendi":"Pausa";if(!paused)Draw();});
         Button("Cancella", 0, ()=>{points.Clear();Draw();});
         Button("Richiama", .5f, ()=>Place());
+        PanelMoveBar.Attach(root, .56f, 1.25f, material);
         lifetime=new CancellationTokenSource();
         try {
             var url=new UriBuilder(source.apiBaseUrl) { Scheme=source.apiBaseUrl.StartsWith("https",StringComparison.OrdinalIgnoreCase)?"wss":"ws", Path="/api/measurements/live", Query="" };
@@ -132,7 +133,8 @@ public class LiveValueChart : MonoBehaviour
         var camera=Camera.main;if(camera==null)return;
         var forward=Vector3.ProjectOnPlane(camera.transform.forward,Vector3.up).normalized;
         if(forward.sqrMagnitude<.1f)forward=Vector3.forward;
-        root.position=camera.transform.position+forward*1.6f+Vector3.Cross(Vector3.up,forward)*1.1f;
+        forward=Quaternion.Euler(0f,65f,0f)*forward;
+        root.position=camera.transform.position+forward*1.8f;
         root.rotation=Quaternion.LookRotation(forward);placed=true;root.gameObject.SetActive(true);
     }
     void Draw() {

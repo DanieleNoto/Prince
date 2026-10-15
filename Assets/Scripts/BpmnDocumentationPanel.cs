@@ -110,6 +110,7 @@ public class BpmnDocumentationPanel : MonoBehaviour
             top - CloseSize * 0.7f,
             -0.006f);
 
+        PanelMoveBar.Attach(transform, top, width, panelMaterial);
         PlaceInFrontOf(viewer);
     }
 

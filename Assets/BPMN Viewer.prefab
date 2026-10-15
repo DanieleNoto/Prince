@@ -52,8 +52,11 @@ MonoBehaviour:
   nodePrefab: {fileID: 3559901139526480132, guid: 3c3e8b3da6faeb449a526cba658ac64f, type: 3}
   autoScaleFromPrefab: 1
   scale: 0.002
-  spacing: 1.15
-  maxWidth: 5
+  readingLayout: 1
+  labelGap: 0.08
+  readingMaxHeight: 1.6
+  spacing: 1.8
+  maxWidth: 2.8
   drawConnections: 1
   lineWidth: 0.008
   lineColor: {r: 0, g: 0, b: 0, a: 1}
@@ -66,14 +69,14 @@ MonoBehaviour:
   gatewaySize: {x: 0.19, y: 0.19, z: 0.06}
   nodeLabelColor: {r: 0, g: 0, b: 0, a: 1}
   nodeLabelBold: 1
-  nodeLabelWidth: 0.3
-  nodeLabelMargin: 0.035
+  nodeLabelWidth: 0.48
+  nodeLabelMargin: 0.06
   nodeLabelBackground: 1
   nodeLabelBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
   nodeLabelPadding: {x: 0.018, y: 0.01}
   showIdWhenUnnamed: 0
   normalizeNodeLabels: 1
-  nodeLabelHeight: 0.045
+  nodeLabelHeight: 0.065
   showFlowLabels: 1
   flowLabelHeight: 0.045
   flowLabelColor: {r: 0, g: 0, b: 0, a: 1}
@@ -83,7 +86,7 @@ MonoBehaviour:
   taskColor: {r: 0.32, g: 0.55, b: 0.9, a: 1}
   gatewayColor: {r: 0.95, g: 0.75, b: 0.25, a: 1}
   otherColor: {r: 0.65, g: 0.65, b: 0.7, a: 1}
-  showAnnotations: 1
+  showAnnotations: 0
   annotationTextHeight: 0.028
   annotationTextColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
   annotationBackgroundColor: {r: 1, g: 0.97, b: 0.86, a: 1}
@@ -91,7 +94,7 @@ MonoBehaviour:
   annotationLineColor: {r: 0.45, g: 0.45, b: 0.45, a: 1}
   documentationOnClick: 1
   documentedTint: 0.18
-  pulseDocumentedNodes: 1
+  pulseDocumentedNodes: 0
   pulseSpeed: 0.9
   pulseAmount: 0.55
   pulseHighlight: {r: 1, g: 1, b: 1, a: 1}
@@ -99,10 +102,10 @@ MonoBehaviour:
   stopPulseAfterOpening: 0
   placeInFrontOfCameraOnStart: 1
   fitDistanceToDiagram: 1
-  distance: 1.6
+  distance: 2
   minDistance: 1
   maxDistance: 4
-  verticalOffset: -0.1
+  verticalOffset: 0.15
   trackingWarmupFrames: 10
 --- !u!114 &699220628228063509
 MonoBehaviour:
@@ -116,7 +119,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e50e23cb8924df04585e08090264abdc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BpmnNavigator
-  followUser: 1
+  followUser: 0
   followDeadZone: 0.25
   followSpeed: 3
   moveStep: 0.2

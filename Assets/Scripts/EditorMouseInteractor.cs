@@ -19,6 +19,8 @@ public class EditorMouseInteractor : MonoBehaviour
 
     XRBaseInteractable hovered;
     float pitch;
+    BpmnNavigator navigator;
+    PrinceProcessListPanel processPanel;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Install()
@@ -32,9 +34,24 @@ public class EditorMouseInteractor : MonoBehaviour
 
     void Update()
     {
+        // Do not consume scrolling while the Inspector or Scene view has focus.
+        var window = UnityEditor.EditorWindow.focusedWindow;
+        if (!Application.isFocused || window == null || window.GetType().Name != "GameView")
+        { SetHovered(null); return; }
         var cam = Camera.main;
         if (cam == null || !TryGetMouse(out Vector2 position, out bool clicked, out bool looking, out Vector2 delta))
         { SetHovered(null); return; }
+
+        MoveCamera(cam);
+        if (position.x >= 0f && position.y >= 0f && position.x < Screen.width && position.y < Screen.height)
+        {
+            float scroll = ReadScroll();
+            if (!Mathf.Approximately(scroll, 0f))
+            {
+                if (navigator == null) navigator = FindAnyObjectByType<BpmnNavigator>();
+                if (navigator != null) navigator.ZoomDiagram(scroll);
+            }
+        }
 
         if (looking)
         {
@@ -93,6 +110,37 @@ public class EditorMouseInteractor : MonoBehaviour
         }
     }
 
+    void MoveCamera(Camera cam)
+    {
+        if (processPanel == null) processPanel = FindAnyObjectByType<PrinceProcessListPanel>();
+        if (processPanel != null && processPanel.IsEditingFilter || CameraPanelDrag.AnyDragging) return;
+        Vector2 move = Vector2.zero;
+#if ENABLE_INPUT_SYSTEM
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        if (keyboard == null) return;
+        move.x = (keyboard.dKey.isPressed ? 1 : 0) - (keyboard.aKey.isPressed ? 1 : 0);
+        move.y = (keyboard.wKey.isPressed ? 1 : 0) - (keyboard.sKey.isPressed ? 1 : 0);
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        move.x = (Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.A) ? 1 : 0);
+        move.y = (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0);
+#endif
+        Vector3 forward = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+        Vector3 right = Vector3.Cross(Vector3.up, forward);
+        cam.transform.root.position += (forward * move.y + right * move.x).normalized * Mathf.Min(Time.unscaledDeltaTime, .05f);
+    }
+    static float ReadScroll()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var mouse = UnityEngine.InputSystem.Mouse.current;
+        float value = mouse != null ? mouse.scroll.ReadValue().y : 0f;
+        // Support both normalized steps and the older 120-unit wheel events.
+        return Mathf.Clamp(Mathf.Abs(value) > 10f ? value / 120f : value, -4f, 4f);
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        return Mathf.Clamp(Input.mouseScrollDelta.y, -4f, 4f);
+#else
+        return 0f;
+#endif
+    }
     static bool TryGetMouse(out Vector2 position, out bool clicked, out bool looking, out Vector2 delta)
     {
 #if ENABLE_INPUT_SYSTEM

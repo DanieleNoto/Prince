@@ -26,6 +26,11 @@ public class BpmnSceneBuilder : MonoBehaviour
     [Header("Prefab")]
     public GameObject nodePrefab;
 
+    [Header("Vista di lettura")]
+    public bool readingLayout = true;
+    [Min(0.02f)] public float labelGap = 0.08f;
+    [Min(0.1f)] public float readingMaxHeight = 1.6f;
+
     [Header("Scala")]
     [Tooltip("Ricava i metri-per-unita-BPMN dalla larghezza del nodePrefab, cosi' i box non si sovrappongono.")]
     public bool autoScaleFromPrefab = true;
@@ -190,7 +195,7 @@ public class BpmnSceneBuilder : MonoBehaviour
 
     /// <summary>
     /// Costruisce il diagramma da un XML BPMN gia' in memoria (es. ricevuto da Prince/Camunda)
-    /// e lo piazza davanti alla camera. Sostituisce l'eventuale diagramma precedente.
+    /// e conserva la posizione del diagramma precedente. Posiziona davanti alla camera solo il primo.
     /// </summary>
     public bool LoadFromXml(string xml, string sourceLabel = null)
     {
@@ -211,6 +216,7 @@ public class BpmnSceneBuilder : MonoBehaviour
             return false;
         }
 
+        bool alreadyPlaced = diagramRoot != null;
         document = parsed;
         transform.localScale = initialScale; // annulla lo zoom del navigatore sul diagramma precedente
         Rebuild();
@@ -222,7 +228,7 @@ public class BpmnSceneBuilder : MonoBehaviour
             return false;
         }
 
-        PlaceInFrontOfCamera();
+        if (!alreadyPlaced && placeInFrontOfCameraOnStart) PlaceInFrontOfCamera();
         IsReady = true;
         Debug.Log($"[BPMN] Caricato {sourceLabel ?? "diagramma"} da XML in memoria.", this);
         DiagramBuilt?.Invoke();
@@ -340,7 +346,7 @@ public class BpmnSceneBuilder : MonoBehaviour
 
         // Se il diagramma e' troppo largo lo si rimpicciolisce in blocco: scala uniforme,
         // quindi nodi, testi e linee restano proporzionati fra loro.
-        if (maxWidth > 0f && diagramWidth > maxWidth)
+        if (!readingLayout && maxWidth > 0f && diagramWidth > maxWidth)
         {
             float shrink = maxWidth / diagramWidth;
             diagramRoot.localScale = Vector3.one * shrink;
@@ -348,10 +354,23 @@ public class BpmnSceneBuilder : MonoBehaviour
         }
 
         BuildNodes();
+        if (readingLayout) ArrangeReadableNodes();
 
         if (drawConnections) BuildConnections();
         if (showAnnotations) BuildAnnotations();
 
+        float panelTop = 0f;
+        foreach (var renderer in diagramRoot.GetComponentsInChildren<Renderer>())
+        {
+            Bounds bounds = renderer.localBounds;
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 sign = new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1);
+                Vector3 point = transform.InverseTransformPoint(renderer.transform.TransformPoint(bounds.center + Vector3.Scale(bounds.extents, sign)));
+                panelTop = Mathf.Max(panelTop, point.y);
+            }
+        }
+        PanelMoveBar.Attach(transform, panelTop, .86f, ResolveLineMaterial());
         int documentati = 0;
         foreach (BpmnNode n in document.Nodes) if (n.HasDocumentation) documentati++;
 
@@ -378,6 +397,7 @@ public class BpmnSceneBuilder : MonoBehaviour
             if (view != null) view.Setup(node.Id, label, node.TypeName);
 
             if (shapeByType) ApplyShape(obj, node.Kind);
+            if (readingLayout) obj.transform.localScale *= 0.55f;
             if (documentationOnClick && node.HasDocumentation) MakeClickable(obj, node);
             if (normalizeNodeLabels) NormalizeNodeLabel(obj);
             Color nodeColor = ColorFor(node.Kind);
@@ -396,6 +416,67 @@ public class BpmnSceneBuilder : MonoBehaviour
 
             nodeObjects[node.Id] = obj;
         }
+    }
+
+    // Measure actual glyphs/backgrounds in diagram space, including long multiline names.
+    Rect ReadableBounds(GameObject node)
+    {
+        Vector3 anchor = node.transform.localPosition;
+        var result = new Rect(anchor.x - .06f, anchor.y - .06f, .12f, .12f);
+        foreach (var renderer in node.GetComponentsInChildren<Renderer>())
+        {
+            Bounds bounds = renderer.localBounds;
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 offset = Vector3.Scale(bounds.extents, new Vector3(
+                    (corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1));
+                Vector3 point = diagramRoot.InverseTransformPoint(renderer.transform.TransformPoint(bounds.center + offset));
+                result.xMin = Mathf.Min(result.xMin, point.x); result.xMax = Mathf.Max(result.xMax, point.x);
+                result.yMin = Mathf.Min(result.yMin, point.y); result.yMax = Mathf.Max(result.yMax, point.y);
+            }
+        }
+        return result;
+    }
+
+    void ArrangeReadableNodes()
+    {
+        var ordered = new List<GameObject>(nodeObjects.Values);
+        ordered.Sort((a, b) => {
+            int row = b.transform.localPosition.y.CompareTo(a.transform.localPosition.y);
+            return row != 0 ? row : a.transform.localPosition.x.CompareTo(b.transform.localPosition.x);
+        });
+        var occupied = new List<Rect>();
+        foreach (var node in ordered)
+        {
+            // Preserve source ordering; move only overlapping cards downward.
+            Rect box = ReadableBounds(node);
+            for (int pass = 0; pass <= occupied.Count; pass++)
+            {
+                bool moved = false;
+                foreach (Rect prior in occupied)
+                {
+                    if (box.xMax + labelGap <= prior.xMin || box.xMin >= prior.xMax + labelGap
+                        || box.yMax + labelGap <= prior.yMin || box.yMin >= prior.yMax + labelGap) continue;
+                    float shift = prior.yMin - labelGap - box.yMax;
+                    node.transform.localPosition += Vector3.up * shift;
+                    box.y += shift; moved = true;
+                }
+                if (!moved) break;
+            }
+            occupied.Add(box);
+        }
+        if (occupied.Count == 0) return;
+        Rect total = occupied[0];
+        foreach (Rect box in occupied) {
+            total.xMin = Mathf.Min(total.xMin, box.xMin); total.xMax = Mathf.Max(total.xMax, box.xMax);
+            total.yMin = Mathf.Min(total.yMin, box.yMin); total.yMax = Mathf.Max(total.yMax, box.yMax);
+        }
+        foreach (var node in ordered) node.transform.localPosition -= new Vector3(total.center.x, total.center.y, 0f);
+        // Fit the completed layout uniformly, after measuring labels and resolving overlaps.
+        float fit = Mathf.Min(1f, Mathf.Max(0.1f, readingMaxHeight) / Mathf.Max(total.height, 0.001f));
+        if (maxWidth > 0f) fit = Mathf.Min(fit, maxWidth / Mathf.Max(total.width, 0.001f));
+        diagramRoot.localScale = Vector3.one * fit;
+        diagramWidth = total.width * fit;
     }
 
     void BuildConnections()
@@ -521,6 +602,18 @@ public class BpmnSceneBuilder : MonoBehaviour
     {
         var points = new List<Vector3>();
 
+        if (readingLayout && nodeObjects.TryGetValue(flow.SourceRef, out var from)
+            && nodeObjects.TryGetValue(flow.TargetRef, out var to))
+        {
+            Vector3 a = from.transform.localPosition + Vector3.forward * 0.06f;
+            Vector3 b = to.transform.localPosition + Vector3.forward * 0.06f;
+            float middle = (a.x + b.x) * 0.5f;
+            points.Add(a);
+            points.Add(new Vector3(middle, a.y, a.z));
+            points.Add(new Vector3(middle, b.y, b.z));
+            points.Add(b);
+            return points;
+        }
         if (flow.Waypoints.Count >= 2)
         {
             // I waypoint del BPMNDiagram partono e arrivano gia' sul bordo delle forme.
@@ -582,7 +675,7 @@ public class BpmnSceneBuilder : MonoBehaviour
         if (forward.sqrMagnitude < 1e-4f) forward = Vector3.forward;
         else forward.Normalize();
 
-        float d = fitDistanceToDiagram
+        float d = !readingLayout && fitDistanceToDiagram
             ? Mathf.Clamp(diagramWidth * 0.85f, minDistance, maxDistance)
             : distance;
 
@@ -697,6 +790,9 @@ public class BpmnSceneBuilder : MonoBehaviour
             nodeLabelWidth / worldScale,
             nodeLabelHeight * 4f / worldScale);
 
+        label.enableAutoSizing = false;
+        label.textWrappingMode = TextWrappingModes.Normal;
+        label.richText = false;
         label.overflowMode = TextOverflowModes.Overflow;
         label.alignment = TextAlignmentOptions.Center;
 

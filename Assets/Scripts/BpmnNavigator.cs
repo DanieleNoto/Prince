@@ -15,6 +15,10 @@ public class BpmnNavigator : MonoBehaviour
     public float followSpeed = 3f;
     public float moveStep = 0.2f;
     public float closeDistance = 1.15f;
+    [Header("Zoom con controller destro")]
+    public bool rightStickZoom = true;
+    [Range(0.1f, 0.8f)] public float zoomStickDeadZone = 0.25f;
+    [Min(0.1f)] public float zoomStepsPerSecond = 5f;
 
     BpmnSceneBuilder builder;
     readonly List<GameObject> nodes = new List<GameObject>();
@@ -24,7 +28,7 @@ public class BpmnNavigator : MonoBehaviour
     TMP_Text status, followLabel, isolateLabel;
     Material backgroundMaterial, buttonMaterial, hoverMaterial;
     Vector3 originalScale, headAnchor;
-    bool ready, isolated = true, panelPlaced;
+    bool ready, isolated = true;
     int selected = -1, hovered;
     Camera viewer;
 
@@ -98,9 +102,11 @@ public class BpmnNavigator : MonoBehaviour
 
     void LateUpdate()
     {
+        if (viewer == null) viewer = Camera.main;
         if (!ready || viewer == null || !HasTracking()) return;
+        UpdateControllerZoom();
         Vector3 head = viewer.transform.position;
-        if (followUser && hovered == 0)
+        if (followUser && hovered == 0 && !CameraPanelDrag.AnyDragging)
         {
             Vector3 delta = head - headAnchor;
             if (delta.magnitude > followDeadZone)
@@ -112,20 +118,19 @@ public class BpmnNavigator : MonoBehaviour
             }
         }
 
-        // The controls remain reachable even when the diagram is fixed in the room.
-        // Hold them still while a controller ray hovers a button.
-        if (hovered == 0 || !panelPlaced)
-        {
-            Vector3 forward = FlatForward();
-            Vector3 target = head + forward * 0.95f + Vector3.down * 0.43f;
-            Quaternion rotation = Quaternion.LookRotation(forward, Vector3.up);
-            float t = panelPlaced ? 1f - Mathf.Exp(-7f * Time.unscaledDeltaTime) : 1f;
-            panel.SetPositionAndRotation(Vector3.Lerp(panel.position, target, t),
-                Quaternion.Slerp(panel.rotation, rotation, t));
-            panelPlaced = true;
-        }
     }
 
+    void UpdateControllerZoom()
+    {
+        if (!rightStickZoom || !Application.isFocused || CameraPanelDrag.AnyDragging) return;
+        var right = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+        if (!right.isValid || !right.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 axis)) return;
+        float magnitude = Mathf.Abs(axis.y);
+        // Ignore resting stick noise and primarily horizontal gestures (e.g. snap turn).
+        if (magnitude <= zoomStickDeadZone || magnitude <= Mathf.Abs(axis.x)) return;
+        float amount = Mathf.Sign(axis.y) * Mathf.InverseLerp(zoomStickDeadZone, 1f, magnitude);
+        ZoomDiagram(amount * zoomStepsPerSecond * Mathf.Min(Time.unscaledDeltaTime, 0.05f));
+    }
     Vector3 FlatForward()
     {
         Vector3 f = Vector3.ProjectOnPlane(viewer.transform.forward, Vector3.up);
@@ -216,6 +221,18 @@ public class BpmnNavigator : MonoBehaviour
         visibility.Clear();
     }
 
+    /// <summary>Scale around the selected node (or diagram center), keeping controls unchanged.</summary>
+    public void ZoomDiagram(float wheelSteps)
+    {
+        if (!ready || Mathf.Approximately(wheelSteps, 0f)) return;
+        Transform pivot = selected >= 0 && selected < nodes.Count ? nodes[selected].transform : transform;
+        Vector3 anchor = pivot.position;
+        float baseline = Mathf.Max(Mathf.Abs(originalScale.x), 0.0001f);
+        float current = Mathf.Abs(transform.localScale.x) / baseline;
+        float target = Mathf.Clamp(current * Mathf.Exp(wheelSteps * 0.12f), 0.25f, 8f);
+        transform.localScale = originalScale * target;
+        transform.position += anchor - pivot.position;
+    }
     public void MoveDiagram(Vector3 localDirection)
     {
         if (!ready) return;
@@ -246,7 +263,8 @@ public class BpmnNavigator : MonoBehaviour
         backgroundMaterial = MakeMaterial("BPMN Controls", new Color(0.025f, 0.04f, 0.075f));
         buttonMaterial = MakeMaterial("BPMN Button", new Color(0.08f, 0.19f, 0.31f));
         hoverMaterial = MakeMaterial("BPMN Button Hover", new Color(0.08f, 0.43f, 0.58f));
-        Quad(panel, "Background", Vector3.zero, new Vector2(0.86f, 0.43f), backgroundMaterial);
+        Quad(panel, "Background", new Vector3(0f, -0.039f, 0f), new Vector2(0.86f, 0.508f), backgroundMaterial);
+        PanelMoveBar.Attach(panel, .215f, .86f, buttonMaterial, true);
         status = Text(panel, "Caricamento", new Vector3(0, 0.165f, -0.006f), new Vector2(0.8f, 0.06f), 0.027f);
         followLabel = Button(0, 0, "Segui", ToggleFollow);
         Button(1, 0, "Richiama", Recall);
@@ -260,6 +278,8 @@ public class BpmnNavigator : MonoBehaviour
         Button(0, 3, "Avvicina", () => MoveDiagram(Vector3.back));
         Button(1, 3, "Allontana", () => MoveDiagram(Vector3.forward));
         Button(2, 3, "Giu", () => MoveDiagram(Vector3.down));
+        Button(0, 4, "Zoom -", () => ZoomDiagram(-1f));
+        Button(2, 4, "Zoom +", () => ZoomDiagram(1f));
     }
 
     TMP_Text Button(int col, int row, string caption, UnityEngine.Events.UnityAction action)
