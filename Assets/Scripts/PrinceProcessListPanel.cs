@@ -120,8 +120,8 @@ public partial class PrinceProcessListPanel : MonoBehaviour
         BuildPanel();
         SetVisible(false);
         yield return WaitForTracking();
+        SetVisible(true); // prima di Recall: la disposizione misura i renderer visibili
         Recall();
-        SetVisible(true);
 
         if (loadOnStart) Refresh();
         else SetStatus("Premi Aggiorna per caricare i processi");
@@ -169,7 +169,6 @@ public partial class PrinceProcessListPanel : MonoBehaviour
             // Keep Prince records and individual Camunda definitions as separate list entries.
             if (definitions != null) PrinceProcesses.Link(result, definitions);
             var allPrince = new List<PrinceProcess>(result);
-            result.RemoveAll(p => string.Equals(p.status?.Trim(), "DEPRECATED", StringComparison.OrdinalIgnoreCase));
             if (definitions != null)
             {
                 var camundaRows = PrinceProcesses.FromDefinitions(definitions);
@@ -230,7 +229,7 @@ public partial class PrinceProcessListPanel : MonoBehaviour
             Paint(row);
         }
 
-        if (processCountTitle != null) processCountTitle.text = $"Processi: {filtered.Count} / {processes.Count}";
+        if (processCountTitle != null) processCountTitle.text = $"Risultati trovati: {filtered.Count}";
         if (filtered.Count == 0) SetStatus("Nessun processo corrisponde ai filtri");
         else SetStatus(StatusLine());
     }
@@ -352,7 +351,16 @@ public partial class PrinceProcessListPanel : MonoBehaviour
 
     /// <summary>Riporta il pannello davanti all'utente, spostato di yawOffset gradi.</summary>
     [ContextMenu("Richiama davanti alla camera")]
-    public void Recall() => PlaceAt(yawOffset);
+    public void Recall()
+    {
+        var builder = FindAnyObjectByType<BpmnSceneBuilder>();
+        if (builder == null || builder.useSharedLayout)
+        {
+            PanelLayout.Register(transform, PanelLayout.Column.Left, 0);
+            PanelLayout.Recenter();
+        }
+        else PlaceAt(yawOffset);
+    }
 
     void PlaceAt(float yaw)
     {
@@ -404,6 +412,7 @@ public partial class PrinceProcessListPanel : MonoBehaviour
     {
         foreach (Transform child in transform) child.gameObject.SetActive(visible);
         if (visible && filterKeyboard != null) filterKeyboard.SetActive(editing >= 0);
+        if (visible && filterPopup != null) filterPopup.SetActive(false);
         if (visible) ShowPage(); // riapplica le righe vuote nascoste
     }
 

@@ -13,7 +13,7 @@ public class BpmnDocumentationPanel : MonoBehaviour
     const float BodyHeight = 0.030f;
     const float CloseSize = 0.05f;
 
-    public float width = 0.58f;
+    public float width = 0.62f;
     public float distanceFromCamera = 0.85f;
     public Color backgroundColor = new Color(0.98f, 0.98f, 0.98f);
     public Color textColor = Color.black;
@@ -111,6 +111,9 @@ public class BpmnDocumentationPanel : MonoBehaviour
             -0.006f);
 
         PanelMoveBar.Attach(transform, top, width, panelMaterial);
+        // Unico pannello che puo' sovrapporsi agli altri: compare davanti allo sguardo, piu' vicino
+        // di tutti, e resta fuori dalla disposizione a colonne (PanelLayout).
+        PanelLayout.Unregister(transform);
         PlaceInFrontOf(viewer);
     }
 

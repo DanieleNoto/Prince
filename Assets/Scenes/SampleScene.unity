@@ -2826,16 +2826,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c06657b2e7756b2409a4dd7ad4e2d1ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BpmnSceneBuilder
-  apiBaseUrl: http://192.168.1.55:3000
+  loadFromApiOnStart: 0
+  apiBaseUrl: http://localhost:3000
   diagramId: richiesta_ferie
-  apiKey:
+  apiKey: 
   requestTimeoutSeconds: 15
   nodePrefab: {fileID: 3559901139526480132, guid: 3c3e8b3da6faeb449a526cba658ac64f, type: 3}
-  autoScaleFromPrefab: 1
-  scale: 0.002
   readingLayout: 1
   labelGap: 0.08
   readingMaxHeight: 1.6
+  compactColumns: 1
+  columnGap: 0.12
+  autoScaleFromPrefab: 1
+  scale: 0.002
   spacing: 1.8
   maxWidth: 2.8
   drawConnections: 1
@@ -2875,12 +2878,16 @@ MonoBehaviour:
   annotationLineColor: {r: 0.45, g: 0.45, b: 0.45, a: 1}
   documentationOnClick: 1
   documentedTint: 0.18
-  pulseDocumentedNodes: 0
-  pulseSpeed: 0.9
-  pulseAmount: 0.55
-  pulseHighlight: {r: 1, g: 1, b: 1, a: 1}
+  pulseDocumentedNodes: 1
+  pulseSpeed: 1
+  pulseAmount: 0.85
+  pulseHighlight: {r: 1, g: 0.55, b: 0.1, a: 1}
   pulseHardBlink: 0
   stopPulseAfterOpening: 0
+  highlightDocumented: 0
+  documentedAccent: {r: 1, g: 0.55, b: 0.1, a: 1}
+  documentedBadgeSize: 0.075
+  documentedFrame: 0.02
   placeInFrontOfCameraOnStart: 1
   fitDistanceToDiagram: 1
   distance: 2
@@ -2888,6 +2895,7 @@ MonoBehaviour:
   maxDistance: 4
   verticalOffset: 0.15
   trackingWarmupFrames: 10
+  enableLiveChart: 1
 --- !u!4 &2004528375
 Transform:
   m_ObjectHideFlags: 0
@@ -2920,6 +2928,9 @@ MonoBehaviour:
   followSpeed: 3
   moveStep: 0.2
   closeDistance: 1.15
+  rightStickZoom: 1
+  zoomStickDeadZone: 0.25
+  zoomStepsPerSecond: 5
 --- !u!1 &2066117192 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8893227839204258060, guid: 66d40221d132d04499855da9ce315f20, type: 3}

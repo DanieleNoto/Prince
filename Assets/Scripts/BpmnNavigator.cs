@@ -113,7 +113,8 @@ public class BpmnNavigator : MonoBehaviour
             {
                 Vector3 step = delta.normalized * (delta.magnitude - followDeadZone)
                     * (1f - Mathf.Exp(-followSpeed * Time.unscaledDeltaTime));
-                transform.position += step;
+                if (builder.useSharedLayout) PanelLayout.Translate(step); // tutti i pannelli insieme
+                else transform.position += step;
                 headAnchor += step;
             }
         }
@@ -264,7 +265,8 @@ public class BpmnNavigator : MonoBehaviour
         buttonMaterial = MakeMaterial("BPMN Button", new Color(0.08f, 0.19f, 0.31f));
         hoverMaterial = MakeMaterial("BPMN Button Hover", new Color(0.08f, 0.43f, 0.58f));
         Quad(panel, "Background", new Vector3(0f, -0.039f, 0f), new Vector2(0.86f, 0.508f), backgroundMaterial);
-        PanelMoveBar.Attach(panel, .215f, .86f, buttonMaterial, true);
+        // Con la disposizione condivisa i comandi stanno fermi sotto al diagramma invece di seguire la testa.
+        PanelMoveBar.Attach(panel, .215f, .86f, buttonMaterial, !builder.useSharedLayout);
         status = Text(panel, "Caricamento", new Vector3(0, 0.165f, -0.006f), new Vector2(0.8f, 0.06f), 0.027f);
         followLabel = Button(0, 0, "Segui", ToggleFollow);
         Button(1, 0, "Richiama", Recall);
@@ -280,6 +282,13 @@ public class BpmnNavigator : MonoBehaviour
         Button(2, 3, "Giu", () => MoveDiagram(Vector3.down));
         Button(0, 4, "Zoom -", () => ZoomDiagram(-1f));
         Button(2, 4, "Zoom +", () => ZoomDiagram(1f));
+
+        if (builder.useSharedLayout)
+        {
+            panel.localScale = Vector3.one * 0.8f;
+            PanelLayout.Register(panel, PanelLayout.Column.Center, 1); // sotto al diagramma
+            PanelLayout.Arrange();
+        }
     }
 
     TMP_Text Button(int col, int row, string caption, UnityEngine.Events.UnityAction action)

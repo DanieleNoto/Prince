@@ -21,7 +21,7 @@ public static class EditorPreviewEnvironment
         if (camera == null) return;
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = Application.isEditor
-            ? new Color(0.12f, 0.16f, 0.22f, 1f)
+            ? new Color(0.89f, 0.95f, 1f, 1f) // cielo chiaro, fra bianco e azzurro
             : new Color(0f, 0f, 0f, 0f);
     }
 }
